@@ -1,4 +1,3 @@
-
 import { google } from 'googleapis';
 
 export default async function handler(req, res) {
@@ -6,11 +5,20 @@ export default async function handler(req, res) {
     const d = (req.query.d || '').toString().trim().toLowerCase();
     if (!d) return res.status(400).json({ error: 'Missing ?d=domain' });
 
-    // Accept either multi-line key or single line with \n
-    const keyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '';
-    const private_key = keyRaw.includes('\\n')
-      ? keyRaw.replace(/\\n/g, '\n').replace(/\r/g, '')
-      : keyRaw;
+    // ✅ Normalize private key from env:
+    // - works if you pasted the whole JSON by mistake
+    // - works if key is multiline
+    // - works if key uses \n
+    const raw = (process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '').trim();
+    const maybeJson = raw.startsWith('{') ? JSON.parse(raw).private_key : raw;
+    const private_key = maybeJson.includes('\\n')
+      ? maybeJson.replace(/\\n/g, '\n').replace(/\r/g, '')
+      : maybeJson.replace(/\r/g, '');
+
+    if (!private_key.startsWith('-----BEGIN PRIVATE KEY-----')) {
+      console.error('Private key not in PEM format');
+      return res.status(500).json({ error: 'Key format error' });
+    }
 
     const auth = new google.auth.GoogleAuth({
       credentials: {
