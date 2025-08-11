@@ -1,0 +1,8 @@
+{
+  "name": "simulator",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "googleapis": "^128.0.0"
+  }
+}

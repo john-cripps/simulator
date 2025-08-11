@@ -1,0 +1,109 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Email Revenue Simulator</title>
+  <style>
+    :root{ --brand:#0ea5e9; }
+    body{ font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial; margin:0; background:#0b1220; color:#e6f0ff; }
+    .wrap{ max-width:880px; margin:0 auto; padding:24px 16px 48px; }
+    .card{ background:#0f172a; border:1px solid #18223b; border-radius:14px; padding:16px; margin-top:14px; }
+    .row{ display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+    .k{ flex:1 1 150px; }
+    label{ font-size:12px; opacity:.8; display:block; margin-bottom:4px; }
+    input[type="number"]{ width:100%; padding:8px; border-radius:10px; border:1px solid #243351; background:#0b1428; color:#e6f0ff; }
+    input[type="range"]{ width:100%; }
+    .pill{ display:inline-block; padding:6px 10px; border-radius:999px; border:1px solid #223056; font-size:12px; }
+    .accent{ color: var(--brand); font-weight:700; }
+    .btn{ background:var(--brand); color:#061025; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; text-decoration:none; }
+    h1{ margin:6px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap" id="app">
+    <div class="card">Loading…</div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const domain = (params.get('d') || '').trim().toLowerCase();
+    const app = document.getElementById('app');
+    if(!domain){ app.innerHTML = '<div class="card"><b>Missing ?d=domain</b></div>'; }
+
+    fetch('/api/sim?d=' + encodeURIComponent(domain))
+      .then(r => r.json())
+      .then(init)
+      .catch(() => app.innerHTML = '<div class="card">API error.</div>');
+
+    function money(n){ return '$' + (Math.max(0, Math.round(n))).toLocaleString(); }
+    function project(list, openPct, clickPct, convPct, aov, emails, rpm=18){
+      const open=openPct/100, click=clickPct/100, conv=convPct/100;
+      if (aov>0){
+        const campaigns = list*open*click*conv*aov*emails;
+        const flows = campaigns*(0.6*(emails/8 ? Math.min(1.2, emails/8) : 0.5));
+        return {campaigns,flows,total:campaigns+flows};
+      } else {
+        const opensPerEmail = list*open;
+        const campaigns = (opensPerEmail*emails/1000)*rpm;
+        const flows = campaigns*0.4;
+        return {campaigns,flows,total:campaigns+flows};
+      }
+    }
+
+    function init(cfg){
+      if(cfg.error){ app.innerHTML = '<div class="card">'+cfg.error+'</div>'; return; }
+      app.innerHTML = `
+        <div class="row">
+          <img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(cfg.domain)}&sz=128" width="40" height="40" style="border-radius:10px" />
+          <div>
+            <div class="pill">${cfg.company} · ${cfg.niche}</div>
+            <h1>Email Revenue Simulator</h1>
+            <div>Domain: <span class="accent">${cfg.domain}</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <div class="k"><label>List size</label><input id="list" type="number" min="0" value="${cfg.list}"></div>
+            <div class="k"><label>Open rate (%)</label><input id="open" type="number" step="0.1" min="0" max="100" value="${cfg.open}"></div>
+            <div class="k"><label>Click rate (%)</label><input id="click" type="number" step="0.1" min="0" max="100" value="${cfg.click}"></div>
+            <div class="k"><label>Conversion rate (%) ${cfg.aov>0?'':'(— for media)'}</label>
+              <input id="conv" type="number" step="0.1" min="0" max="100" value="${cfg.aov>0?cfg.conv:0}" ${cfg.aov>0?'':'disabled'}>
+            </div>
+            <div class="k"><label>Avg order value ($) ${cfg.aov>0?'':'(0 = media)'}</label><input id="aov" type="number" min="0" value="${cfg.aov}"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <label>Emails per month: <b id="emailsLabel">8</b></label>
+          <input id="emails" type="range" min="0" max="20" value="8">
+          <div style="margin-top:10px">
+            Campaigns: <span class="accent" id="rCampaign">$0</span><br>
+            Flows: <span class="accent" id="rFlows">$0</span><br>
+            <div style="margin-top:6px; font-size:18px; font-weight:800;">Total: <span class="accent" id="rTotal">$0</span></div>
+          </div>
+          <div style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap;">
+            <a class="btn" target="_blank" href="https://calendly.com/YOUR_HANDLE/intro?name=${encodeURIComponent(cfg.company)}">Book a 15-min setup call</a>
+            <a class="pill" href="https://${cfg.domain}" target="_blank" rel="noopener">Visit site</a>
+          </div>
+          <div style="margin-top:8px; font-size:12px; opacity:.75;">Defaults use niche benchmarks. Plug in real metrics to update instantly.</div>
+        </div>
+      `;
+
+      const $ = id => document.getElementById(id);
+      const recalc = ()=>{
+        const list=+$('list').value||0, open=+$('open').value||0, click=+$('click').value||0, conv=+$('conv').value||0, aov=+$('aov').value||0, emails=+$('emails').value||0;
+        $('emailsLabel').textContent = emails;
+        const p = project(list, open, click, conv, aov, emails, cfg.rpm||18);
+        $('rCampaign').textContent = money(p.campaigns);
+        $('rFlows').textContent    = money(p.flows);
+        $('rTotal').textContent    = money(p.total);
+      };
+      ['list','open','click','conv','aov','emails'].forEach(id=> document.getElementById(id).addEventListener('input', recalc));
+      recalc();
+    }
+  </script>
+</body>
+</html>
