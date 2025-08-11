@@ -71,6 +71,21 @@ export default async function handler(req, res) {
       aov: BM.aov,
       rpm: BM.rpm
     };
+    
+export default async function handler(req, res) {
+  const raw = (process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '').trim();
+  const startsWith = raw.slice(0, 31);
+  const endsWith = raw.slice(-31);
+  res.status(200).json({
+    haveEmail: !!process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+    haveKey: !!raw,
+    keyLooksJson: raw.startsWith('{'),
+    keyStartsWith: startsWith,   // should show -----BEGIN PRIVATE KEY-----
+    keyEndsWith: endsWith,       // should show PRIVATE KEY-----\n or similar
+    sheetId: process.env.SHEET_ID || null,
+    sheetName: process.env.SHEET_NAME || null
+  });
+}
 
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=600');
     return res.status(200).json(response);
