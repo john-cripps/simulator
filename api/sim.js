@@ -6,12 +6,20 @@ export default async function handler(req, res) {
     const d = (req.query.d || '').toString().trim().toLowerCase();
     if (!d) return res.status(400).json({ error: 'Missing ?d=domain' });
 
-    const auth = new google.auth.JWT(
-      process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      null,
-      (process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '').replace(/\n/g, '\n'),
-      ['https://www.googleapis.com/auth/spreadsheets.readonly']
-    );
+    // Accept either multi-line key or single line with \n
+    const keyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY || '';
+    const private_key = keyRaw.includes('\\n')
+      ? keyRaw.replace(/\\n/g, '\n').replace(/\r/g, '')
+      : keyRaw;
+
+    const auth = new google.auth.GoogleAuth({
+      credentials: {
+        client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+        private_key,
+      },
+      scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'],
+    });
+
     const sheets = google.sheets({ version: 'v4', auth });
 
     const sheetId = process.env.SHEET_ID;
